@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "php82", "php82Packages.composer"]
+nixPkgs = ["nodejs_20", "php84", "php84Packages.composer"]
 
 [phases.install]
 cmds = [
