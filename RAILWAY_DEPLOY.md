@@ -93,10 +93,10 @@ LOG_LEVEL=error
 Railwayは自動的に以下を実行します：
 
 1. **ビルドフェーズ** (`nixpacks.toml`に基づく):
-   - Composer依存関係のインストール（`--no-dev --optimize-autoloader`）
-   - npm依存関係のインストール（`npm ci`）
+   - Composer依存関係のインストール（`--no-dev --optimize-autoloader --no-interaction`）
+   - npm依存関係のインストール（`npm ci --prefer-offline --no-audit`）
    - アセットのビルド（`npm run build`）
-   - 設定のキャッシュ（`config:cache`, `route:cache`, `view:cache`）
+   - 設定のキャッシュ（`config:cache`, `route:cache`, `view:cache`）- エラー時はスキップ
 
 2. **デプロイフェーズ** (`Procfile`に基づく):
    - データベースマイグレーション実行（`php artisan migrate --force`）
