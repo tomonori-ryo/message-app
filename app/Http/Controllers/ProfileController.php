@@ -17,8 +17,12 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): View
     {
+        $user = $request->user();
+        $blockedUsers = $user->blockedUsers()->get();
+        
         return view('profile.edit', [
-            'user' => $request->user(),
+            'user' => $user,
+            'blockedUsers' => $blockedUsers,
         ]);
     }
 

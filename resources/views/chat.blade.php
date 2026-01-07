@@ -8,6 +8,7 @@
 </head>
 @php
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 @endphp
 <body class="bg-slate-100 font-sans text-gray-900 antialiased overflow-hidden fixed w-full h-full">
 
@@ -21,12 +22,11 @@ use Illuminate\Support\Facades\Storage;
             </a>
             <h1 class="font-bold text-lg text-gray-800">
                 @if($chatPartner)
-                    <div>
-                        <div>{{ $chatPartner->name }}とのチャット</div>
-                        @if($chatPartner->username)
-                            <div class="text-xs font-normal text-gray-500">{{ '@' . $chatPartner->username }}</div>
-                        @endif
-                    </div>
+                    @if(isset($partnerBlockedMe) && $partnerBlockedMe || isset($partnerRemovedMe) && $partnerRemovedMe)
+                        ユーザーが退室しました
+                    @else
+                        {{ $chatPartnerDisplayName ?? $chatPartner->name }}
+                    @endif
                 @else
                     チャットルーム
                 @endif
@@ -55,7 +55,7 @@ use Illuminate\Support\Facades\Storage;
                     </svg>
                     メモ一覧を見る
                 </a>
-                <a href="{{ route('notifications.settings') }}" class="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                <a href="{{ route('notifications.settings', $chatPartner ? ['return_to' => 'chat', 'user_id' => $chatPartner->id] : []) }}" class="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100 flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
                     </svg>
@@ -70,6 +70,32 @@ use Illuminate\Support\Facades\Storage;
                         ログアウト
                     </button>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- ■ アナウンス表示エリア（固定表示・吹き出し風） --}}
+    <div id="announcement-banner" class="fixed left-0 right-0 hidden" style="top: 64px; z-index: 35;">
+        <div class="max-w-2xl mx-auto px-4 pt-3">
+            <div class="bg-white border-2 border-indigo-300 rounded-2xl shadow-lg px-4 py-3 relative">
+                {{-- 吹き出しの矢印 --}}
+                <div class="absolute -top-2 left-6 w-4 h-4 bg-white border-l-2 border-t-2 border-indigo-300 transform rotate-45"></div>
+                <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 110-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.615.38a1.125 1.125 0 01-1.447-.849l-.267-1.281a1.125 1.125 0 00-.758-1.219l-.22-.076a1.125 1.125 0 01-.564-1.582c.15-.472.32-.928.51-1.368m0 9.18a23.91 23.91 0 01-8.835 2.33M6 20.25a23.91 23.91 0 008.835-2.33m0 0a23.93 23.93 0 003.281-.477m.415-.011c.677-.236 1.354-.522 2.003-.79a24.238 24.238 0 001.281-5.821c0-.578-.276-1.097-.463-1.511a20.022 20.022 0 00-.985-2.783m0 0a23.91 23.91 0 00-8.835-2.33m0 0a6.718 6.718 0 01-7.007-.656" />
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-semibold text-indigo-600 mb-1">アナウンス</p>
+                        <p id="announcement-text" class="text-sm text-gray-800 break-words"></p>
+                    </div>
+                    <button onclick="dismissAnnouncement()" class="text-gray-400 hover:text-gray-600 transition p-1 shrink-0 -mt-1 -mr-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -732,6 +758,332 @@ use Illuminate\Support\Facades\Storage;
             }
         }
         @endif
+
+        // --- メッセージコンテキストメニュー ---
+        let contextMenu = null;
+        let selectedMessageId = null;
+        let selectedMessageBody = null;
+
+        function createContextMenu() {
+            if (contextMenu) {
+                contextMenu.remove();
+            }
+
+            contextMenu = document.createElement('div');
+            contextMenu.id = 'message-context-menu';
+            contextMenu.className = 'fixed bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50 hidden';
+            contextMenu.innerHTML = `
+                <button onclick="announceMessage()" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 110-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.615.38a1.125 1.125 0 01-1.447-.849l-.267-1.281a1.125 1.125 0 00-.758-1.219l-.22-.076a1.125 1.125 0 01-.564-1.582c.15-.472.32-.928.51-1.368m0 9.18a23.91 23.91 0 01-8.835 2.33M6 20.25a23.91 23.91 0 008.835-2.33m0 0a23.93 23.93 0 003.281-.477m.415-.011c.677-.236 1.354-.522 2.003-.79a24.238 24.238 0 001.281-5.821c0-.578-.276-1.097-.463-1.511a20.022 20.022 0 00-.985-2.783m0 0a23.91 23.91 0 00-8.835-2.33m0 0a6.718 6.718 0 01-7.007-.656" />
+                    </svg>
+                    アナウンス
+                </button>
+                <button onclick="copyToMemo()" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                    </svg>
+                    メモに書き写し
+                </button>
+                <button onclick="deleteMessage()" class="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                    </svg>
+                    削除
+                </button>
+            `;
+            document.body.appendChild(contextMenu);
+        }
+
+        function showContextMenu(event, messageId, messageBody) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            selectedMessageId = messageId;
+            selectedMessageBody = messageBody;
+            
+            if (!contextMenu) {
+                createContextMenu();
+            }
+            
+            contextMenu.classList.remove('hidden');
+            
+            const x = event.clientX || (event.touches && event.touches[0] ? event.touches[0].clientX : 0);
+            const y = event.clientY || (event.touches && event.touches[0] ? event.touches[0].clientY : 0);
+            const menuWidth = 200;
+            const menuHeight = 150;
+            
+            // 画面外に出ないように調整
+            const left = Math.min(x, window.innerWidth - menuWidth - 10);
+            const top = Math.min(y, window.innerHeight - menuHeight - 10);
+            
+            contextMenu.style.left = `${left}px`;
+            contextMenu.style.top = `${top}px`;
+        }
+
+        function hideContextMenu() {
+            if (contextMenu) {
+                contextMenu.classList.add('hidden');
+            }
+        }
+
+        // メッセージバブルにイベントリスナーを追加
+        document.addEventListener('DOMContentLoaded', function() {
+            createContextMenu();
+            
+            // 右クリックイベント
+            document.addEventListener('contextmenu', function(e) {
+                const messageBubble = e.target.closest('.message-bubble');
+                if (messageBubble) {
+                    const messageId = messageBubble.dataset.messageId;
+                    const messageBody = messageBubble.dataset.messageBody;
+                    showContextMenu(e, messageId, messageBody);
+                }
+            });
+            
+            // 長押しイベント（モバイル）
+            let touchStartTime = 0;
+            let touchTimer = null;
+            
+            document.addEventListener('touchstart', function(e) {
+                const messageBubble = e.target.closest('.message-bubble');
+                if (messageBubble) {
+                    touchStartTime = Date.now();
+                    const messageId = messageBubble.dataset.messageId;
+                    const messageBody = messageBubble.dataset.messageBody;
+                    
+                    touchTimer = setTimeout(() => {
+                        const touch = e.touches[0] || e.changedTouches[0];
+                        const fakeEvent = {
+                            clientX: touch.clientX,
+                            clientY: touch.clientY,
+                            preventDefault: () => {},
+                            stopPropagation: () => {}
+                        };
+                        showContextMenu(fakeEvent, messageId, messageBody);
+                    }, 500);
+                }
+            });
+            
+            document.addEventListener('touchend', function() {
+                if (touchTimer) {
+                    clearTimeout(touchTimer);
+                    touchTimer = null;
+                }
+            });
+            
+            // メニュー外をクリックで閉じる
+            document.addEventListener('click', function(e) {
+                if (contextMenu && !contextMenu.contains(e.target)) {
+                    hideContextMenu();
+                }
+            });
+        });
+
+        // アナウンス機能（選択したメッセージを上部に表示）
+        async function announceMessage() {
+            hideContextMenu();
+            
+            console.log('announceMessage called, selectedMessageBody:', selectedMessageBody);
+            
+            @if($chatPartner)
+            if (!selectedMessageBody) {
+                alert('メッセージが選択されていません');
+                return;
+            }
+            
+            // アナウンスをデータベースに保存
+            try {
+                const response = await fetch('{{ route("chat.announce", ["user" => $chatPartner->id]) }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        message: selectedMessageBody
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // 上部バナーにアナウンスを表示
+                    showAnnouncementBanner(selectedMessageBody);
+                } else {
+                    alert(data.error || 'アナウンスの保存に失敗しました');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('アナウンスの保存に失敗しました');
+            }
+            @else
+            alert('チャット相手が選択されていません');
+            @endif
+        }
+        
+        // グローバルスコープで確実に呼び出せるようにする
+        window.announceMessage = announceMessage;
+
+        // アナウンスバナーを表示
+        function showAnnouncementBanner(messageText) {
+            console.log('showAnnouncementBanner called with:', messageText);
+            
+            const banner = document.getElementById('announcement-banner');
+            const announcementText = document.getElementById('announcement-text');
+            
+            console.log('banner element:', banner);
+            console.log('announcementText element:', announcementText);
+            
+            if (!banner) {
+                console.error('アナウンスバナーが見つかりません');
+                return;
+            }
+            
+            if (!announcementText) {
+                console.error('アナウンステキスト要素が見つかりません');
+                return;
+            }
+
+            // メッセージテキストを設定
+            announcementText.textContent = messageText;
+            console.log('メッセージテキストを設定しました:', messageText);
+            
+            // バナーを表示（hiddenクラスを削除）
+            banner.classList.remove('hidden');
+            console.log('バナーのhiddenクラスを削除しました');
+            
+            // チャットエリアのパディングを調整（バナー表示後に高さを取得）
+            const chatContainer = document.getElementById('chat-container');
+            if (chatContainer) {
+                // 少し待ってからバナーの高さを取得
+                setTimeout(() => {
+                    const bannerHeight = banner.offsetHeight || 80;
+                    console.log('バナーの高さ:', bannerHeight);
+                    chatContainer.style.paddingTop = `${64 + bannerHeight}px`; // ヘッダー64px + バナー高さ
+                }, 10);
+            }
+        }
+
+        // アナウンスバナーを閉じる
+        function dismissAnnouncement() {
+            const banner = document.getElementById('announcement-banner');
+            if (!banner) {
+                return;
+            }
+            
+            // バナーを非表示
+            banner.classList.add('hidden');
+            
+            // チャットエリアのパディングを元に戻す
+            const chatContainer = document.getElementById('chat-container');
+            if (chatContainer) {
+                chatContainer.style.paddingTop = '64px'; // ヘッダーの高さのみ
+            }
+            
+            // アナウンスを閉じたことをサーバーに記録
+            @if(isset($latestAnnouncement) && $latestAnnouncement)
+            fetch('{{ route("chat.announcement.dismiss", ["message" => $latestAnnouncement->id]) }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('アナウンスを閉じたことを記録しました');
+                } else {
+                    console.error('アナウンスの閉じた記録に失敗しました:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error dismissing announcement:', error);
+            });
+            @endif
+        }
+        
+        // グローバルスコープで確実に呼び出せるようにする
+        window.dismissAnnouncement = dismissAnnouncement;
+
+        // ページ読み込み時にアナウンスを表示
+        document.addEventListener('DOMContentLoaded', function() {
+            @if(isset($latestAnnouncement) && $latestAnnouncement)
+                showAnnouncementBanner('{{ addslashes($latestAnnouncement->body) }}');
+            @endif
+        });
+
+        // メモに書き写し
+        function copyToMemo() {
+            hideContextMenu();
+            
+            if (!selectedMessageBody) {
+                alert('メッセージが選択されていません');
+                return;
+            }
+            
+            // クイックメモを開く
+            openQuickMemo();
+            
+            // メッセージをテキストエリアに追加
+            setTimeout(() => {
+                const memoContent = document.getElementById('quick-memo-content');
+                if (memoContent) {
+                    const currentContent = memoContent.value.trim();
+                    if (currentContent) {
+                        memoContent.value = currentContent + '\n\n' + selectedMessageBody;
+                    } else {
+                        memoContent.value = selectedMessageBody;
+                    }
+                    memoContent.focus();
+                    // カーソルを最後に移動
+                    memoContent.setSelectionRange(memoContent.value.length, memoContent.value.length);
+                }
+            }, 300);
+        }
+
+        // メッセージ削除
+        async function deleteMessage() {
+            hideContextMenu();
+            
+            if (!selectedMessageId) {
+                alert('メッセージが選択されていません');
+                return;
+            }
+            
+            if (!confirm('このメッセージを削除しますか？')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/chat/message/${selectedMessageId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    }
+                });
+                
+                if (response.ok) {
+                    // メッセージをDOMから削除
+                    const messageBubble = document.querySelector(`[data-message-id="${selectedMessageId}"]`);
+                    if (messageBubble) {
+                        const messageContainer = messageBubble.closest('.flex');
+                        if (messageContainer) {
+                            messageContainer.remove();
+                        }
+                    }
+                } else {
+                    const data = await response.json();
+                    alert(data.error || 'メッセージの削除に失敗しました');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('メッセージの削除に失敗しました');
+            }
+        }
 
     </script>
 </body>

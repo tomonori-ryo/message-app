@@ -16,18 +16,35 @@ class NotificationController extends Controller
     /**
      * 通知設定画面を表示
      */
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
         $notificationTypes = NotificationType::where('is_active', true)->get();
-        // ユーザーが有効にしている通知タイプのIDを取得
-        $userNotificationTypes = $user->notificationTypes()
-            ->wherePivot('is_enabled', true)
-            ->withPivot('icon_image', 'is_enabled')
-            ->pluck('notification_type_id')
-            ->toArray();
         
-        return view('notifications.settings', compact('user', 'notificationTypes', 'userNotificationTypes'));
+        // 戻り先の情報を取得
+        $returnTo = $request->input('return_to');
+        $userId = $request->input('user_id');
+        
+        // チャット相手が指定されている場合は、その相手の通知設定を取得
+        $userNotificationTypes = [];
+        if ($userId) {
+            $setting = \App\Models\UserSenderNotificationType::where('user_id', $user->id)
+                ->where('sender_id', $userId)
+                ->first();
+            
+            if ($setting && $setting->notification_type_id) {
+                $userNotificationTypes = [$setting->notification_type_id];
+            }
+        } else {
+            // チャット相手が指定されていない場合は、通常の通知設定を取得
+            $userNotificationTypes = $user->notificationTypes()
+                ->wherePivot('is_enabled', true)
+                ->withPivot('icon_image', 'is_enabled')
+                ->pluck('notification_type_id')
+                ->toArray();
+        }
+        
+        return view('notifications.settings', compact('user', 'notificationTypes', 'userNotificationTypes', 'returnTo', 'userId'));
     }
 
     /**
@@ -36,11 +53,50 @@ class NotificationController extends Controller
     public function update(Request $request)
     {
         $request->validate([
-            'notification_type' => 'required|exists:notification_types,id',
+            'notification_type' => 'required',
+            'sender_id' => 'nullable|exists:users,id',
         ]);
 
         $user = Auth::user();
         $selectedTypeId = $request->input('notification_type');
+        $senderId = $request->input('sender_id');
+        
+        // チャット相手が指定されている場合は、user_sender_notification_typesテーブルを更新
+        if ($senderId) {
+            // 通知タイプが存在するか確認（システム定義またはカスタム）
+            $notificationType = NotificationType::find($selectedTypeId);
+            $customType = null;
+            
+            if (!$notificationType) {
+                $customType = \App\Models\CustomNotificationType::where('id', $selectedTypeId)
+                    ->where('user_id', $user->id)
+                    ->first();
+                
+                if (!$customType) {
+                    return back()->withErrors(['notification_type' => '無効な通知タイプです']);
+                }
+            }
+            
+            // user_sender_notification_typesテーブルを更新
+            \App\Models\UserSenderNotificationType::updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'sender_id' => $senderId,
+                ],
+                [
+                    'notification_type_id' => $selectedTypeId,
+                ]
+            );
+            
+            return back()->with('success', '通知設定を更新しました');
+        }
+        
+        // チャット相手が指定されていない場合は、通常の通知設定を更新
+        // 通知タイプが存在するか確認
+        $exists = NotificationType::where('id', $selectedTypeId)->exists();
+        if (!$exists) {
+            return back()->withErrors(['notification_type' => '無効な通知タイプです']);
+        }
         
         // 全ての通知タイプを取得
         $allTypes = NotificationType::where('is_active', true)->pluck('id');
@@ -88,17 +144,8 @@ class NotificationController extends Controller
             }
         }
 
-        // システム定義の通知タイプの場合、受信者が有効にしているか確認
-        if ($notificationType) {
-            $isEnabled = $receiver->notificationTypes()
-                ->where('notification_type_id', $notificationType->id)
-                ->wherePivot('is_enabled', true)
-                ->exists();
-
-            if (!$isEnabled) {
-                return response()->json(['error' => '受信者がこの通知タイプを有効にしていません'], 400);
-            }
-        }
+        // アナウンス機能では受信設定の確認をスキップ（LINEのように常に送信）
+        // システム定義の通知タイプの場合でも、アナウンスは常に送信可能
 
         // 偽装通知のタイトルと本文を生成
         $typeForCamouflage = $notificationType ?? $customType;

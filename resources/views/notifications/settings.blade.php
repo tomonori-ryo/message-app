@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Storage;
     <header class="fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-md z-50 h-16 flex items-center px-4 border-b border-gray-200/80 shadow-sm">
         <div class="max-w-3xl mx-auto w-full flex items-center gap-3">
             {{-- 戻るボタン --}}
-            <a href="{{ route('chat') }}" class="p-2 -ml-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-full transition-colors duration-200">
+            <a href="{{ $returnTo === 'chat' && $userId ? route('chat', ['user' => $userId]) : ($returnTo === 'chat' ? route('chat') : route('dashboard')) }}" class="p-2 -ml-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-full transition-colors duration-200">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
                 </svg>
@@ -40,6 +40,9 @@ use Illuminate\Support\Facades\Storage;
             <form method="POST" action="{{ route('notifications.update') }}" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 @csrf
                 @method('PATCH')
+                @if($userId)
+                    <input type="hidden" name="sender_id" value="{{ $userId }}">
+                @endif
                 
                 <h2 class="text-lg font-bold text-gray-800 mb-6">通知タイプを選択</h2>
                 <p class="text-sm text-gray-500 mb-6">受け取りたい通知の種類を1つ選択してください</p>

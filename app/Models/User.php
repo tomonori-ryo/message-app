@@ -23,6 +23,7 @@ class User extends Authenticatable
         'email',
         'password',
         'avatar',
+        'google_id',
     ];
 
     /**
@@ -81,5 +82,17 @@ class User extends Authenticatable
     public function senderNotificationTypes()
     {
         return $this->hasMany(UserSenderNotificationType::class);
+    }
+    public function blockedUsers()
+    {
+        return $this->belongsToMany(User::class, 'blocks', 'user_id', 'blocked_user_id');
+    }
+    public function blockedBy()
+    {
+        return $this->belongsToMany(User::class, 'blocks', 'blocked_user_id', 'user_id');
+    }
+    public function friendCategories()
+    {
+        return $this->hasMany(FriendCategory::class)->orderBy('order');
     }
 }

@@ -10,7 +10,7 @@ class Message extends Model
     use HasFactory;
 
     // 保存してもいい項目を指定
-    protected $fillable = ['body', 'user_id', 'receiver_id'];
+    protected $fillable = ['body', 'user_id', 'receiver_id', 'is_announcement'];
 
     // ユーザーとの関係（このメッセージを書いた人は...）
     public function user()

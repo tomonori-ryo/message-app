@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Message;
+use App\Models\Notification;
 use App\Models\NotificationType;
 use App\Models\CustomNotificationType;
 use App\Models\UserSenderNotificationType;
@@ -22,6 +23,14 @@ class ChatController extends Controller
         if ($userId) {
             $chatPartner = \App\Models\User::findOrFail($userId);
             
+            // ブロック関係を確認
+            $isBlocked = $currentUser->blockedUsers()->where('users.id', $userId)->exists() ||
+                        $currentUser->blockedBy()->where('users.id', $userId)->exists();
+            
+            if ($isBlocked) {
+                abort(403, 'このユーザーとのチャットは許可されていません');
+            }
+            
             // 友達関係を確認
             $isFriend = $currentUser->friends()->where('friend_id', $userId)->exists() ||
                        $chatPartner->friends()->where('friend_id', $currentUser->id)->exists();
@@ -30,25 +39,24 @@ class ChatController extends Controller
                 abort(403, 'このユーザーとのチャットは許可されていません');
             }
             
+            // 相手が自分をブロックしているか、友達解除しているかを確認
+            $partnerBlockedMe = $chatPartner->blockedUsers()->where('users.id', $currentUser->id)->exists();
+            $partnerRemovedMe = !$chatPartner->friends()->where('friend_id', $currentUser->id)->exists() && 
+                               $currentUser->friends()->where('friend_id', $userId)->exists();
+            
             // 現在のユーザーと指定されたユーザー間のメッセージのみを取得
-            // 後方互換性のため、receiver_idがnullのメッセージも含める（古いメッセージ）
+            // セキュリティのため、必ず両方のユーザーIDを条件に含める
             $messages = Message::where(function($query) use ($currentUser, $userId) {
+                // 新しい形式：receiver_idが指定されているメッセージ
+                // 現在のユーザーからチャット相手へのメッセージ
                 $query->where(function($q) use ($currentUser, $userId) {
-                    // 新しい形式：receiver_idが指定されているメッセージ
-                    $q->where(function($subQ) use ($currentUser, $userId) {
-                        $subQ->where('user_id', $currentUser->id)
-                             ->where('receiver_id', $userId);
-                    })->orWhere(function($subQ) use ($currentUser, $userId) {
-                        $subQ->where('user_id', $userId)
-                             ->where('receiver_id', $currentUser->id);
-                    });
-                })->orWhere(function($q) use ($currentUser, $userId) {
-                    // 古い形式：receiver_idがnullのメッセージ（後方互換性のため）
-                    $q->whereNull('receiver_id')
-                      ->where(function($subQ) use ($currentUser, $userId) {
-                          $subQ->where('user_id', $currentUser->id)
-                               ->orWhere('user_id', $userId);
-                      });
+                    $q->where('user_id', $currentUser->id)
+                      ->where('receiver_id', $userId);
+                })
+                // チャット相手から現在のユーザーへのメッセージ
+                ->orWhere(function($q) use ($currentUser, $userId) {
+                    $q->where('user_id', $userId)
+                      ->where('receiver_id', $currentUser->id);
                 });
             })
             ->with(['user', 'receiver'])
@@ -56,9 +64,17 @@ class ChatController extends Controller
             ->get();
         } else {
             // ユーザーIDが指定されていない場合は、最新のチャット相手を表示
+            // セキュリティのため、必ず現在のユーザーが送信者または受信者のメッセージのみを取得
             $latestMessage = Message::where(function($query) use ($currentUser) {
-                $query->where('user_id', $currentUser->id)
-                      ->orWhere('receiver_id', $currentUser->id);
+                // 現在のユーザーが送信者で、receiver_idが設定されているメッセージ
+                $query->where(function($q) use ($currentUser) {
+                    $q->where('user_id', $currentUser->id)
+                      ->whereNotNull('receiver_id');
+                })
+                // 現在のユーザーが受信者のメッセージ
+                ->orWhere(function($q) use ($currentUser) {
+                    $q->where('receiver_id', $currentUser->id);
+                });
             })
             ->latest()
             ->first();
@@ -104,11 +120,58 @@ class ChatController extends Controller
             return $type;
         }));
         
+        // チャット画面を開いたときに、このチャット相手からの未読通知を既読にする
+        if ($chatPartner) {
+            Notification::where('user_id', $currentUser->id)
+                ->where('sender_id', $userId)
+                ->where('is_read', false)
+                ->update([
+                    'is_read' => true,
+                    'read_at' => now(),
+                ]);
+        }
+        
+        // 最新のアナウンスを取得（閉じられていないもののみ）
+        $latestAnnouncement = null;
+        $chatPartnerDisplayName = null;
+        if ($chatPartner) {
+            // 閉じられたアナウンスのIDを取得
+            $dismissedAnnouncementIds = DB::table('user_dismissed_announcements')
+                ->where('user_id', $currentUser->id)
+                ->pluck('message_id')
+                ->toArray();
+            
+            $latestAnnouncement = Message::where(function($query) use ($currentUser, $userId) {
+                $query->where(function($q) use ($currentUser, $userId) {
+                    $q->where('user_id', $currentUser->id)
+                      ->where('receiver_id', $userId);
+                })->orWhere(function($q) use ($currentUser, $userId) {
+                    $q->where('user_id', $userId)
+                      ->where('receiver_id', $currentUser->id);
+                });
+            })
+            ->where('is_announcement', true)
+            ->whereNotIn('id', $dismissedAnnouncementIds) // 閉じられたアナウンスを除外
+            ->latest()
+            ->first();
+            
+            // チャット相手の表示名を取得
+            $friendRelation = DB::table('friends')
+                ->where('user_id', $currentUser->id)
+                ->where('friend_id', $userId)
+                ->first();
+            $chatPartnerDisplayName = $friendRelation->display_name ?? null;
+        }
+        
         return view('chat', [
             'messages' => $messages,
             'notificationTypes' => $allTypesForSelection,
             'chatPartner' => $chatPartner,
+            'chatPartnerDisplayName' => $chatPartnerDisplayName,
             'senderNotificationTypes' => $senderNotificationTypes,
+            'partnerBlockedMe' => $partnerBlockedMe ?? false,
+            'partnerRemovedMe' => $partnerRemovedMe ?? false,
+            'latestAnnouncement' => $latestAnnouncement,
         ]);
     }
 
@@ -180,6 +243,91 @@ class ChatController extends Controller
             );
         }
 
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * メッセージを削除
+     */
+    public function destroy(Message $message)
+    {
+        $user = Auth::user();
+        
+        // 自分のメッセージのみ削除可能
+        if ($message->user_id !== $user->id) {
+            abort(403, 'このメッセージを削除する権限がありません');
+        }
+        
+        $message->delete();
+        
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * アナウンスを保存
+     */
+    public function announce(Request $request, $userId)
+    {
+        $request->validate([
+            'message' => 'required|string|max:500',
+        ]);
+
+        $receiver = \App\Models\User::findOrFail($userId);
+        $currentUser = $request->user();
+        
+        // 友達関係を確認
+        $isFriend = $currentUser->friends()->where('friend_id', $userId)->exists() ||
+                   $receiver->friends()->where('friend_id', $currentUser->id)->exists();
+        
+        if (!$isFriend) {
+            abort(403, 'このユーザーにアナウンスを送信することは許可されていません');
+        }
+
+        // アナウンスとしてメッセージを保存
+        $message = $currentUser->messages()->create([
+            'body' => $request->input('message'),
+            'receiver_id' => $userId,
+            'is_announcement' => true,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $message->body,
+        ]);
+    }
+
+    /**
+     * アナウンスを閉じたことを記録
+     */
+    public function dismissAnnouncement(Request $request, Message $message)
+    {
+        $user = Auth::user();
+        
+        // アナウンスかどうか確認
+        if (!$message->is_announcement) {
+            abort(400, 'このメッセージはアナウンスではありません');
+        }
+        
+        // このアナウンスが現在のユーザーに関連しているか確認
+        $isRelated = ($message->user_id === $user->id && $message->receiver_id) ||
+                    ($message->receiver_id === $user->id && $message->user_id);
+        
+        if (!$isRelated) {
+            abort(403, 'このアナウンスを閉じる権限がありません');
+        }
+        
+        // 閉じたことを記録（重複を防ぐ）
+        DB::table('user_dismissed_announcements')->updateOrInsert(
+            [
+                'user_id' => $user->id,
+                'message_id' => $message->id,
+            ],
+            [
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
+        
         return response()->json(['success' => true]);
     }
 }

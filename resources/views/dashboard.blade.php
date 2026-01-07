@@ -14,13 +14,6 @@
         <h1 class="font-bold text-xl text-slate-800">ホーム</h1>
         
         <div class="flex items-center gap-2">
-            {{-- 通知設定 --}}
-            <a href="{{ route('notifications.settings') }}" class="p-2 bg-purple-100 rounded-full hover:bg-purple-200 transition" title="通知設定">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-purple-600">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
-                </svg>
-            </a>
-            
             {{-- ログアウト --}}
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
@@ -59,56 +52,10 @@
             </div>
         </div>
 
-        {{-- ① 友達リスト --}}
-        <div class="mb-8">
-            <h3 class="text-sm font-bold text-gray-500 mb-2 pl-1">友達リスト</h3>
-            <div class="flex flex-col gap-2">
-                @foreach ($friends as $friend)
-                    {{-- カード全体枠 --}}
-                    <div class="bg-white p-3 pr-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between gap-3 transition active:scale-[0.99]">
-                        
-                        {{-- 左側（タップでチャットへ）：flex-1で余白を埋める --}}
-                        <a href="{{ route('chat', ['user' => $friend->id]) }}" class="flex-1 flex items-center gap-3 py-1">
-                            <div class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg overflow-hidden shrink-0">
-                                @if($friend->avatar)
-                                    <img src="{{ Storage::url($friend->avatar) }}" alt="{{ $friend->name }}" class="w-full h-full object-cover">
-                                @else
-                                    {{ substr($friend->name, 0, 1) }}
-                                @endif
-                            </div>
-                            <div>
-                                <div class="font-bold text-gray-800">{{ $friend->name }}</div>
-                                @if($friend->username)
-                                    <div class="text-xs text-gray-400">{{ '@' . $friend->username }}</div>
-                                @else
-                                    <div class="text-xs text-gray-400">タップしてチャット</div>
-                                @endif
-                            </div>
-                        </a>
-
-                        {{-- 右側（メモ一覧ボタン）：独立したリンク --}}
-                        <a href="{{ route('memos.by_user', $friend->id) }}" class="flex flex-col items-center justify-center w-14 h-12 bg-yellow-50 hover:bg-yellow-100 text-yellow-600 rounded-xl border border-yellow-100 transition shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 mb-0.5">
-                              <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                            </svg>
-                            <span class="text-[10px] font-bold">メモ</span>
-                        </a>
-
-                    </div>
-                @endforeach
-
-                @if ($friends->isEmpty())
-                    <div class="bg-white p-6 rounded-2xl text-center border border-dashed border-gray-300">
-                        <p class="text-gray-400 text-sm">まだ友達がいません</p>
-                    </div>
-                @endif
-            </div>
-        </div>
-
         {{-- ② ユーザー検索 --}}
         <div class="mb-8">
             <h3 class="text-sm font-bold text-gray-500 mb-2 pl-1">ユーザー検索</h3>
-            <form method="GET" action="{{ route('dashboard') }}" class="mb-4">
+            <form method="GET" action="{{ route('dashboard') }}" class="mb-2">
                 <div class="flex gap-2">
                     <input 
                         type="text" 
@@ -127,6 +74,11 @@
                     @endif
                 </div>
             </form>
+            <div class="text-center">
+                <button type="button" onclick="showMyQrCode()" class="text-xs text-indigo-600 hover:text-indigo-700 underline">
+                    QRコードで追加
+                </button>
+            </div>
 
             {{-- 検索結果 --}}
             @if($searchQuery)
@@ -154,16 +106,15 @@
                                         @endif
                                     </div>
                                 </div>
-                                
-                                @if($isFriend)
-                                    <span class="text-xs text-gray-400 px-3 py-1 bg-gray-100 rounded-full">友達</span>
-                                @else
+                                @if(!$isFriend && $result->id !== auth()->id())
                                     <form method="POST" action="{{ route('friends.add', $result->id) }}">
                                         @csrf
-                                        <button type="submit" class="bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-full hover:bg-black transition">
-                                            追加
+                                        <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
+                                            友達追加
                                         </button>
                                     </form>
+                                @elseif($isFriend)
+                                    <span class="text-xs text-gray-400 px-4 py-2">友達</span>
                                 @endif
                             </div>
                         @endforeach
@@ -173,45 +124,112 @@
                         </div>
                     @endif
                 </div>
-            @else
-                {{-- 知り合いかも？セクション（検索していない時のみ表示） --}}
-                <div class="flex flex-col gap-2">
-                    @foreach ($others as $other)
-                        <div class="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-sm overflow-hidden">
-                                    @if($other->avatar)
-                                        <img src="{{ Storage::url($other->avatar) }}" alt="{{ $other->name }}" class="w-full h-full object-cover">
-                                    @else
-                                        {{ substr($other->name, 0, 1) }}
-                                    @endif
+            @endif
+        </div>
+
+        {{-- ① 友達リスト（カテゴリー管理ボタン付き） --}}
+        <div class="mb-8">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-bold text-gray-500 pl-1">友達リスト</h3>
+                <button onclick="openCategoryManager()" class="text-xs text-indigo-600 hover:text-indigo-700 font-medium px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition">
+                    カテゴリー管理
+                </button>
+            </div>
+            
+            {{-- タブUI --}}
+            @if($friends->isNotEmpty())
+            <div class="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide" style="scrollbar-width: none; -ms-overflow-style: none;">
+                <button onclick="switchCategoryTab('all')" id="tab-all" class="friend-tab active flex-shrink-0 px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white transition">
+                    全て
+                </button>
+                @foreach ($categories as $category)
+                    <button onclick="switchCategoryTab({{ $category->id }})" id="tab-{{ $category->id }}" class="friend-tab flex-shrink-0 px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition">
+                        {{ $category->name }}
+                    </button>
+                @endforeach
+            </div>
+            @endif
+            
+            {{-- 友達リストコンテンツ --}}
+            <div id="friends-content">
+                {{-- 「全て」タブのコンテンツ --}}
+                <div id="friends-all" class="friends-tab-content space-y-4">
+                    {{-- カテゴリーごとに友達を表示 --}}
+                    @foreach ($categories as $category)
+                        @php
+                            $categoryFriends = $friendsByCategory[$category->id] ?? collect();
+                        @endphp
+                        @if($categoryFriends->isNotEmpty())
+                            <div class="space-y-2">
+                                <div class="flex items-center justify-between px-2">
+                                    <h4 class="text-xs font-semibold text-gray-600">{{ $category->name }}</h4>
+                                    <span class="text-xs text-gray-400">{{ $categoryFriends->count() }}人</span>
                                 </div>
-                                <div>
-                                    <div class="font-medium text-gray-700 text-sm">{{ $other->name }}</div>
-                                    @if($other->username)
-                                        <div class="text-xs text-gray-400">{{ '@' . $other->username }}</div>
-                                    @else
-                                        <div class="text-xs text-gray-400">{{ $other->email }}</div>
-                                    @endif
-                                </div>
+                                @foreach ($categoryFriends as $friend)
+                                    @include('dashboard.partials.friend-card', [
+                                        'friend' => $friend,
+                                        'friendDisplayNames' => $friendDisplayNames,
+                                        'friendNotificationTypes' => $friendNotificationTypes,
+                                        'friendNotificationIcons' => $friendNotificationIcons,
+                                        'friendUnreadNotifications' => $friendUnreadNotifications
+                                    ])
+                                @endforeach
                             </div>
-                            
-                            <form method="POST" action="{{ route('friends.add', $other->id) }}">
-                                @csrf
-                                <button type="submit" class="bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-full hover:bg-black transition">
-                                    追加
-                                </button>
-                            </form>
-                        </div>
+                        @endif
                     @endforeach
-                    @if($others->isEmpty())
-                        <div class="bg-white p-6 rounded-2xl text-center border border-dashed border-gray-300">
-                            <p class="text-gray-400 text-sm">まだ友達がいません</p>
+                    
+                    {{-- カテゴリー未分類の友達 --}}
+                    @if($uncategorizedFriends->isNotEmpty())
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between px-2">
+                                <h4 class="text-xs font-semibold text-gray-600">未分類</h4>
+                                <span class="text-xs text-gray-400">{{ $uncategorizedFriends->count() }}人</span>
+                            </div>
+                            @foreach ($uncategorizedFriends as $friend)
+                                @include('dashboard.partials.friend-card', [
+                                    'friend' => $friend,
+                                    'friendDisplayNames' => $friendDisplayNames,
+                                    'friendNotificationTypes' => $friendNotificationTypes,
+                                    'friendNotificationIcons' => $friendNotificationIcons,
+                                    'friendUnreadNotifications' => $friendUnreadNotifications
+                                ])
+                            @endforeach
                         </div>
                     @endif
                 </div>
-            @endif
+                
+                {{-- カテゴリーごとのタブコンテンツ --}}
+                @foreach ($categories as $category)
+                    @php
+                        $categoryFriends = $friendsByCategory[$category->id] ?? collect();
+                    @endphp
+                    <div id="friends-{{ $category->id }}" class="friends-tab-content hidden space-y-2">
+                        @if($categoryFriends->isNotEmpty())
+                            @foreach ($categoryFriends as $friend)
+                                @include('dashboard.partials.friend-card', [
+                                    'friend' => $friend,
+                                    'friendDisplayNames' => $friendDisplayNames,
+                                    'friendNotificationTypes' => $friendNotificationTypes,
+                                    'friendNotificationIcons' => $friendNotificationIcons,
+                                    'friendUnreadNotifications' => $friendUnreadNotifications
+                                ])
+                            @endforeach
+                        @else
+                            <div class="bg-white p-6 rounded-2xl text-center border border-dashed border-gray-300">
+                                <p class="text-gray-400 text-sm">このカテゴリーには友達がいません</p>
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+                
+                @if ($friends->isEmpty())
+                    <div class="bg-white p-6 rounded-2xl text-center border border-dashed border-gray-300">
+                        <p class="text-gray-400 text-sm">まだ友達がいません</p>
+                    </div>
+                @endif
+            </div>
         </div>
+
 
         {{-- ③ 通知タイプ管理 --}}
         <div class="mb-8">
@@ -407,9 +425,10 @@
         </div>
     </div>
 
-    @php
-    use Illuminate\Support\Facades\Storage;
-    @endphp
+@php
+use Illuminate\Support\Facades\Storage;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
+@endphp
 
     <script>
         // 通知管理セクションの開閉
@@ -646,6 +665,457 @@
 
         // 5秒ごとに通知をチェック
         setInterval(checkNewNotifications, 5000);
+
+        // 友達メニューの開閉
+        function toggleFriendMenu(friendId) {
+            const menu = document.getElementById(`friend-menu-${friendId}`);
+            // 他のメニューを閉じる
+            document.querySelectorAll('[id^="friend-menu-"]').forEach(m => {
+                if (m.id !== `friend-menu-${friendId}`) {
+                    m.classList.add('hidden');
+                }
+            });
+            menu.classList.toggle('hidden');
+        }
+
+        // メニュー外をクリックで閉じる
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('[id^="friend-menu-"]') && !e.target.closest('button[onclick^="toggleFriendMenu"]')) {
+                document.querySelectorAll('[id^="friend-menu-"]').forEach(m => {
+                    m.classList.add('hidden');
+                });
+            }
+        });
+        
+        // QRコード表示
+        function showMyQrCode() {
+            document.getElementById('qr-modal').classList.remove('hidden');
+        }
+        
+        function closeQrModal() {
+            document.getElementById('qr-modal').classList.add('hidden');
+        }
+        
+        // カテゴリータブの切り替え
+        function switchCategoryTab(categoryId) {
+            // 全てのタブを非アクティブにする
+            document.querySelectorAll('.friend-tab').forEach(tab => {
+                tab.classList.remove('active', 'bg-indigo-600', 'text-white');
+                tab.classList.add('bg-gray-100', 'text-gray-700');
+            });
+            
+            // 全てのコンテンツを非表示にする
+            document.querySelectorAll('.friends-tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            
+            // 選択されたタブをアクティブにする
+            const selectedTab = document.getElementById('tab-' + categoryId);
+            if (selectedTab) {
+                selectedTab.classList.add('active', 'bg-indigo-600', 'text-white');
+                selectedTab.classList.remove('bg-gray-100', 'text-gray-700');
+            }
+            
+            // 選択されたコンテンツを表示する
+            const selectedContent = document.getElementById('friends-' + categoryId);
+            if (selectedContent) {
+                selectedContent.classList.remove('hidden');
+            }
+        }
+        
+        // 友達の表示名を編集
+        function editFriendDisplayName(friendId, currentName) {
+            const newName = prompt('表示名を入力してください:', currentName);
+            if (newName === null) {
+                return; // キャンセル
+            }
+            
+            const displayName = newName.trim() || null;
+            
+            fetch(`/friends/${friendId}/display-name`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({
+                    display_name: displayName
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload(); // ページを再読み込みして変更を反映
+                } else {
+                    alert(data.message || '表示名の更新に失敗しました');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('表示名の更新に失敗しました');
+            });
+        }
+        
+        // カテゴリー管理モーダルを開く
+        function openCategoryManager() {
+            document.getElementById('category-manager-modal').classList.remove('hidden');
+            backToCategorySelection();
+        }
+
+        // カテゴリー管理モーダルを閉じる
+        function closeCategoryManager() {
+            document.getElementById('category-manager-modal').classList.add('hidden');
+            backToCategorySelection();
+        }
+
+        // カテゴリー選択画面に戻る
+        function backToCategorySelection() {
+            document.getElementById('category-selection-step').classList.remove('hidden');
+            document.getElementById('friend-selection-step').classList.add('hidden');
+            selectedCategoryId = null;
+            // チェックボックスをクリア
+            document.querySelectorAll('#friend-selection-step input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+        }
+
+        // 選択されたカテゴリーIDを保持
+        let selectedCategoryId = null;
+
+        // カテゴリーを選択
+        function selectCategory(categoryId, categoryName) {
+            selectedCategoryId = categoryId;
+            document.getElementById('selected-category-name').textContent = categoryName;
+            
+            // 既にそのカテゴリーに属している友達のチェックボックスをチェック
+            document.querySelectorAll('#friend-selection-step input[type="checkbox"]').forEach(checkbox => {
+                const friendId = parseInt(checkbox.dataset.friendId);
+                const label = checkbox.closest('label');
+                const currentCategoryId = label ? parseInt(label.dataset.currentCategory) : null;
+                checkbox.checked = (currentCategoryId === categoryId);
+            });
+            
+            // ステップ2に切り替え
+            document.getElementById('category-selection-step').classList.add('hidden');
+            document.getElementById('friend-selection-step').classList.remove('hidden');
+        }
+
+        // 友達を一括追加（決定ボタン）
+        async function confirmAddFriends() {
+            if (!selectedCategoryId) {
+                alert('カテゴリーが選択されていません');
+                return;
+            }
+
+            const checkboxes = document.querySelectorAll('#friend-selection-step input[type="checkbox"]:checked');
+            const friendIds = Array.from(checkboxes).map(checkbox => parseInt(checkbox.dataset.friendId));
+
+            if (friendIds.length === 0) {
+                alert('追加する友達を選択してください');
+                return;
+            }
+
+            try {
+                // 選択された友達を順番に追加
+                for (const friendId of friendIds) {
+                    await assignFriendToCategorySilent(friendId, selectedCategoryId);
+                }
+
+                // 全て完了したらページを再読み込み
+                location.reload();
+            } catch (error) {
+                console.error('Error:', error);
+                alert('友達の追加に失敗しました');
+            }
+        }
+
+        // サイレントに友達をカテゴリーに割り当て（アラートなし）
+        async function assignFriendToCategorySilent(friendId, categoryId) {
+            const response = await fetch('{{ route("friend-categories.assign") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({
+                    friend_id: friendId,
+                    category_id: categoryId
+                })
+            });
+            
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.message || 'カテゴリーへの割り当てに失敗しました');
+            }
+            
+            return await response.json();
+        }
+
+        // 新しいカテゴリーを作成
+        async function createCategory() {
+            const nameInput = document.getElementById('new-category-name');
+            const name = nameInput.value.trim();
+            
+            if (!name) {
+                alert('カテゴリー名を入力してください');
+                return;
+            }
+            
+            try {
+                const response = await fetch('{{ route("friend-categories.store") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ name: name })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    nameInput.value = '';
+                    location.reload(); // ページを再読み込みしてカテゴリーを反映
+                } else {
+                    alert(data.message || 'カテゴリーの作成に失敗しました');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('カテゴリーの作成に失敗しました');
+            }
+        }
+
+        // 友達をカテゴリーに割り当て
+        async function assignFriendToCategory(friendId, categoryId) {
+            try {
+                const response = await fetch('{{ route("friend-categories.assign") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        friend_id: friendId,
+                        category_id: categoryId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    location.reload(); // ページを再読み込みして変更を反映
+                } else {
+                    alert(data.message || 'カテゴリーへの割り当てに失敗しました');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('カテゴリーへの割り当てに失敗しました');
+            }
+        }
+
+        // カテゴリーを削除
+        async function deleteCategory(categoryId, categoryName) {
+            if (!confirm(`カテゴリー「${categoryName}」を削除しますか？\nこのカテゴリーに属する友達は「未分類」に移動されます。`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/friend-categories/${categoryId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    location.reload(); // ページを再読み込みして変更を反映
+                } else {
+                    alert(data.message || 'カテゴリーの削除に失敗しました');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('カテゴリーの削除に失敗しました');
+            }
+        }
     </script>
+
+    {{-- QRコード表示モーダル --}}
+    <div id="qr-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 pb-16">
+        <div class="bg-white rounded-2xl shadow-lg p-8 pb-10 max-w-md w-full relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeQrModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+            
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">友達追加用QRコード</h2>
+                <p class="text-sm text-gray-500">このQRコードをスキャンして友達に追加してもらえます</p>
+            </div>
+            
+            <div class="flex justify-center mb-6">
+                <div class="bg-white p-4 rounded-xl border-2 border-gray-200">
+                    {!! QrCode::size(250)->generate(route('friends.add-by-qr', ['user_id' => auth()->user()->id])) !!}
+                </div>
+            </div>
+            
+            <div class="text-center mb-8">
+                <div class="inline-block bg-gray-100 rounded-lg px-4 py-2">
+                    <p class="text-xs text-gray-500 mb-1">ユーザー名</p>
+                    <p class="text-sm font-semibold text-gray-800">{{ auth()->user()->name }}</p>
+                    @if(auth()->user()->username)
+                        <p class="text-xs text-gray-400 mt-1">{{ '@' . auth()->user()->username }}</p>
+                    @endif
+                </div>
+            </div>
+            
+            <div class="flex gap-3 mt-6 mb-2">
+                <button onclick="closeQrModal()" class="flex-1 bg-gray-100 text-gray-700 text-center py-3 rounded-xl hover:bg-gray-200 transition font-medium">
+                    閉じる
+                </button>
+                <a href="{{ route('qr.scan') }}" class="flex-1 bg-indigo-600 text-white text-center py-3 rounded-xl hover:bg-indigo-700 transition font-medium">
+                    QRコードを読み込む
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {{-- カテゴリー管理モーダル --}}
+    <div id="category-manager-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-bold text-gray-800">カテゴリー管理</h2>
+                    <button onclick="closeCategoryManager()" class="text-gray-400 hover:text-gray-600 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- 新しいカテゴリー作成 --}}
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">新しいカテゴリー</label>
+                    <div class="flex gap-2">
+                        <input 
+                            type="text" 
+                            id="new-category-name" 
+                            placeholder="カテゴリー名を入力"
+                            class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            onkeypress="if(event.key === 'Enter') createCategory()"
+                        >
+                        <button onclick="createCategory()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
+                            作成
+                        </button>
+                    </div>
+                </div>
+
+                {{-- ステップ1: カテゴリー選択 --}}
+                <div id="category-selection-step" class="space-y-4">
+                    @if($categories->isEmpty())
+                        <p class="text-sm text-gray-500 text-center py-4">まずはカテゴリーを作成してください</p>
+                    @else
+                        @foreach ($categories as $category)
+                            @php
+                                $categoryFriends = $friendsByCategory[$category->id] ?? collect();
+                            @endphp
+                            <div class="border border-gray-200 rounded-lg p-4 bg-white hover:bg-gray-50 transition cursor-pointer" onclick="selectCategory({{ $category->id }}, '{{ addslashes($category->name) }}')">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex-1">
+                                        <h3 class="text-sm font-semibold text-gray-800 mb-1">{{ $category->name }}</h3>
+                                        <p class="text-xs text-gray-500">{{ $categoryFriends->count() }}人の友達</p>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button 
+                                            onclick="event.stopPropagation(); deleteCategory({{ $category->id }}, '{{ addslashes($category->name) }}')" 
+                                            class="text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded transition text-xs font-medium"
+                                            title="カテゴリーを削除"
+                                        >
+                                            削除
+                                        </button>
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 text-gray-400">
+                                          <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    @endif
+                </div>
+
+                {{-- ステップ2: 友達選択（チェックボックス） --}}
+                <div id="friend-selection-step" class="hidden">
+                    <div class="mb-4 flex items-center gap-3">
+                        <button onclick="backToCategorySelection()" class="text-gray-500 hover:text-gray-700 transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                            </svg>
+                        </button>
+                        <h3 class="text-sm font-semibold text-gray-800">
+                            <span id="selected-category-name"></span>に友達を追加
+                        </h3>
+                    </div>
+
+                    <div class="mb-4 max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50">
+                        @foreach ($friends as $friend)
+                            @php
+                                $currentCategoryId = isset($friendCategoryIds[$friend->id]) ? $friendCategoryIds[$friend->id] : null;
+                            @endphp
+                            <label class="flex items-center gap-3 p-2 hover:bg-white rounded-lg cursor-pointer transition" data-friend-id="{{ $friend->id }}" data-current-category="{{ $currentCategoryId }}">
+                                <input 
+                                    type="checkbox" 
+                                    class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                    data-friend-id="{{ $friend->id }}"
+                                >
+                                <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm overflow-hidden shrink-0">
+                                    @if($friend->avatar)
+                                        <img src="{{ Storage::url($friend->avatar) }}" alt="{{ $friend->name }}" class="w-full h-full object-cover">
+                                    @else
+                                        {{ substr($friend->name, 0, 1) }}
+                                    @endif
+                                </div>
+                                <div class="flex-1">
+                                    <div class="text-sm font-medium text-gray-800">{{ $friend->name }}</div>
+                                    @if($friend->username)
+                                        <div class="text-xs text-gray-400">{{ '@' . $friend->username }}</div>
+                                    @endif
+                                </div>
+                                @if($currentCategoryId)
+                                    @php
+                                        $currentCategory = $categories->firstWhere('id', $currentCategoryId);
+                                    @endphp
+                                    @if($currentCategory)
+                                        <span class="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">現在: {{ $currentCategory->name }}</span>
+                                    @endif
+                                @endif
+                            </label>
+                        @endforeach
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button 
+                            onclick="backToCategorySelection()" 
+                            class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm font-medium"
+                        >
+                            キャンセル
+                        </button>
+                        <button 
+                            onclick="confirmAddFriends()" 
+                            class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium"
+                        >
+                            決定
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
