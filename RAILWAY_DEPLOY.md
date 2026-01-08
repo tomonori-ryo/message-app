@@ -60,6 +60,11 @@ QUEUE_CONNECTION=database
 # ログ設定
 LOG_CHANNEL=stack
 LOG_LEVEL=error
+
+# Google OAuth設定（Googleアカウントでログインする場合）
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URI=https://your-app-name.up.railway.app/auth/google/callback
 ```
 
 **重要**: 
