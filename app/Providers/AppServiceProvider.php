@@ -20,10 +20,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // HTTPSを強制（本番環境のみ）
-        if (config('app.env') === 'production') {
-            URL::forceScheme('https');
-        }
+        // HTTPSを強制
+        URL::forceScheme('https');
 
         // 文字エンコーディングをUTF-8に設定
         mb_internal_encoding('UTF-8');
