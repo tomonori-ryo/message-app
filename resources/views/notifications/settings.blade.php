@@ -65,7 +65,7 @@ use Illuminate\Support\Facades\Storage;
                                 <div class="w-12 h-12 rounded-lg flex items-center justify-center text-2xl shrink-0 overflow-hidden transition-all {{ $isSelected ? 'scale-110' : '' }}" 
                                      style="background-color: {{ $type->color ?? '#6B7280' }}20;">
                                     @if($customIcon)
-                                        <img src="{{ Storage::url($customIcon) }}" alt="カスタムアイコン" class="w-full h-full object-cover">
+                                        <img src="{{ image_url($customIcon) }}" alt="カスタムアイコン" class="w-full h-full object-cover">
                                     @elseif($type->icon)
                                         {{ $type->icon }}
                                     @else
@@ -137,7 +137,7 @@ use Illuminate\Support\Facades\Storage;
                                 <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-lg flex items-center justify-center text-2xl sm:text-3xl shrink-0 overflow-hidden border-2 border-gray-200" 
                                      style="background-color: {{ $type->color ?? '#6B7280' }}20;">
                                     @if($customIcon)
-                                        <img src="{{ Storage::url($customIcon) }}" alt="カスタムアイコン" class="w-full h-full object-cover">
+                                        <img src="{{ image_url($customIcon) }}" alt="カスタムアイコン" class="w-full h-full object-cover">
                                     @else
                                         {{ $type->icon ?? '📢' }}
                                     @endif

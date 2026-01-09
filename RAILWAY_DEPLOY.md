@@ -80,18 +80,38 @@ GOOGLE_REDIRECT_URI=https://your-app-name.up.railway.app/auth/google/callback
 - すべての`PG*`変数が正しく設定されているか確認
 - プロジェクトの「Variables」タブで`DB_*`変数が正しく設定されているか確認
 
-### 4. ストレージの設定
+### 4. ストレージの設定（Cloudinary推奨）
 
-ファイルアップロード（アバター、アイコンなど）を永続化するには、以下のいずれかを選択：
+**重要**: Railwayのサーバーは再デプロイのたびにクリーンな状態になるため、ローカルストレージ（`storage/app/public`）に保存された画像ファイルは消えてしまいます。画像を永続化するには、外部ストレージサービスを使用する必要があります。
 
-#### オプションA: Railway Volume（推奨）
-1. 「+ New」→「Volume」を追加
-2. マウントパス: `/app/storage/app/public`
-3. 環境変数に追加: `STORAGE_PATH=/app/storage/app/public`
+#### Cloudinaryを使用する（推奨）
 
-#### オプションB: S3互換ストレージ（本番環境推奨）
-- AWS S3、DigitalOcean Spaces、Cloudflare R2などを使用
-- `config/filesystems.php`で設定
+1. **Cloudinaryアカウントを作成**
+   - [Cloudinary](https://cloudinary.com/)にアクセスして無料アカウントを作成
+
+2. **認証情報を取得**
+   - Cloudinaryダッシュボードから以下を取得：
+     - `Cloud name`
+     - `API Key`
+     - `API Secret`
+
+3. **Railwayの環境変数に追加**
+   ```env
+   CLOUDINARY_CLOUD_NAME=your-cloud-name
+   CLOUDINARY_API_KEY=your-api-key
+   CLOUDINARY_API_SECRET=your-api-secret
+   ```
+
+4. **パッケージのインストール**
+   - 既に`composer.json`に追加済みです
+   - Railwayにデプロイすると自動的にインストールされます
+
+**注意**: `CLOUDINARY_CLOUD_NAME`が設定されていない場合、ローカルストレージ（`public`ディスク）が使用されます。開発環境では環境変数を設定しなくても動作します。
+
+#### その他のオプション
+
+- **Railway Volume**: 一時的な解決策ですが、再デプロイ時に削除される可能性があります
+- **S3互換ストレージ**: AWS S3、DigitalOcean Spaces、Cloudflare R2などを使用
 
 ### 5. ビルドとデプロイ
 

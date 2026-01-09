@@ -158,10 +158,10 @@ class NotificationController extends Controller
                 ->where('notification_type_id', $notificationType->id)
                 ->first();
             if ($userNotificationType && $userNotificationType->pivot->icon_image) {
-                $iconPath = Storage::url($userNotificationType->pivot->icon_image);
+                $iconPath = $this->getImageUrl($userNotificationType->pivot->icon_image);
             }
         } elseif ($customType && $customType->icon_image) {
-            $iconPath = Storage::url($customType->icon_image);
+            $iconPath = $this->getImageUrl($customType->icon_image);
         }
 
         // 通知を作成（カスタムタイプの場合はnotification_type_idをnullに）
@@ -203,7 +203,7 @@ class NotificationController extends Controller
                         ->where('notification_type_id', $notification->notification_type_id)
                         ->first();
                     if ($userNotificationType && $userNotificationType->pivot->icon_image) {
-                        $iconPath = Storage::url($userNotificationType->pivot->icon_image);
+                        $iconPath = $this->getImageUrl($userNotificationType->pivot->icon_image);
                     }
                 }
                 
@@ -395,6 +395,7 @@ class NotificationController extends Controller
         $user = Auth::user();
         $typeId = $request->notification_type_id;
         $kind = $request->input('type_kind', 'system');
+        $disk = env('CLOUDINARY_CLOUD_NAME') ? 'cloudinary' : 'public';
 
         try {
             if ($kind === 'custom') {
@@ -405,14 +406,29 @@ class NotificationController extends Controller
 
                 // 既存のアイコンを削除
                 if ($customType->icon_image) {
-                    Storage::disk('public')->delete($customType->icon_image);
+                    if ($disk === 'cloudinary') {
+                        $publicId = $this->extractPublicIdFromUrl($customType->icon_image);
+                        if ($publicId) {
+                            Storage::disk($disk)->delete($publicId);
+                        }
+                    } else {
+                        Storage::disk($disk)->delete($customType->icon_image);
+                    }
                 }
 
                 // 新しいアイコンを保存
-                $path = $request->file('icon_image')->store('custom-notification-icons', 'public');
-                $customType->update(['icon_image' => $path]);
+                $path = $request->file('icon_image')->store('custom-notification-icons', $disk);
+                
+                // Cloudinaryを使用している場合、パブリックURLを取得
+                if ($disk === 'cloudinary') {
+                    $iconUrl = Storage::disk($disk)->url($path);
+                    $customType->update(['icon_image' => $iconUrl]);
+                } else {
+                    $customType->update(['icon_image' => $path]);
+                }
 
-                return response()->json(['success' => true, 'icon_path' => Storage::url($path)]);
+                $iconPath = $disk === 'cloudinary' ? Storage::disk($disk)->url($path) : Storage::url($path);
+                return response()->json(['success' => true, 'icon_path' => $iconPath]);
             } else {
                 // システム定義の通知タイプの場合
                 // 通知タイプが存在するか確認
@@ -427,18 +443,27 @@ class NotificationController extends Controller
                     ->first();
                 
                 if ($existing && $existing->pivot->icon_image) {
-                    Storage::disk('public')->delete($existing->pivot->icon_image);
+                    if ($disk === 'cloudinary') {
+                        $publicId = $this->extractPublicIdFromUrl($existing->pivot->icon_image);
+                        if ($publicId) {
+                            Storage::disk($disk)->delete($publicId);
+                        }
+                    } else {
+                        Storage::disk($disk)->delete($existing->pivot->icon_image);
+                    }
                 }
 
                 // 新しいアイコンを保存
-                $path = $request->file('icon_image')->store('notification-icons', 'public');
+                $path = $request->file('icon_image')->store('notification-icons', $disk);
 
                 // ピボットテーブルを更新
+                $iconValue = $disk === 'cloudinary' ? Storage::disk($disk)->url($path) : $path;
                 $user->notificationTypes()->syncWithoutDetaching([
-                    $typeId => ['icon_image' => $path]
+                    $typeId => ['icon_image' => $iconValue]
                 ]);
 
-                return response()->json(['success' => true, 'icon_path' => Storage::url($path)]);
+                $iconPath = $disk === 'cloudinary' ? Storage::disk($disk)->url($path) : Storage::url($path);
+                return response()->json(['success' => true, 'icon_path' => $iconPath]);
             }
         } catch (\Exception $e) {
             \Log::error('Icon upload error: ' . $e->getMessage());
@@ -455,13 +480,21 @@ class NotificationController extends Controller
     public function deleteIcon($typeId)
     {
         $user = Auth::user();
+        $disk = env('CLOUDINARY_CLOUD_NAME') ? 'cloudinary' : 'public';
         
         $existing = $user->notificationTypes()
             ->where('notification_type_id', $typeId)
             ->first();
         
         if ($existing && $existing->pivot->icon_image) {
-            Storage::disk('public')->delete($existing->pivot->icon_image);
+            if ($disk === 'cloudinary') {
+                $publicId = $this->extractPublicIdFromUrl($existing->pivot->icon_image);
+                if ($publicId) {
+                    Storage::disk($disk)->delete($publicId);
+                }
+            } else {
+                Storage::disk($disk)->delete($existing->pivot->icon_image);
+            }
             
             $user->notificationTypes()->syncWithoutDetaching([
                 $typeId => ['icon_image' => null]
@@ -499,8 +532,11 @@ class NotificationController extends Controller
             'is_active' => true,
         ];
 
+        $disk = env('CLOUDINARY_CLOUD_NAME') ? 'cloudinary' : 'public';
+        
         if ($request->hasFile('icon_image')) {
-            $data['icon_image'] = $request->file('icon_image')->store('custom-notification-icons', 'public');
+            $path = $request->file('icon_image')->store('custom-notification-icons', $disk);
+            $data['icon_image'] = $disk === 'cloudinary' ? Storage::disk($disk)->url($path) : $path;
         }
 
         $customType = \App\Models\CustomNotificationType::create($data);
@@ -519,13 +555,48 @@ class NotificationController extends Controller
             abort(403);
         }
 
+        $disk = env('CLOUDINARY_CLOUD_NAME') ? 'cloudinary' : 'public';
+        
         if ($customType->icon_image) {
-            Storage::disk('public')->delete($customType->icon_image);
+            if ($disk === 'cloudinary') {
+                $publicId = $this->extractPublicIdFromUrl($customType->icon_image);
+                if ($publicId) {
+                    Storage::disk($disk)->delete($publicId);
+                }
+            } else {
+                Storage::disk($disk)->delete($customType->icon_image);
+            }
         }
 
         $customType->delete();
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Extract public_id from Cloudinary URL
+     */
+    private function extractPublicIdFromUrl($url): ?string
+    {
+        // Cloudinary URL形式: https://res.cloudinary.com/{cloud_name}/image/upload/v{version}/{public_id}.{extension}
+        if (preg_match('/\/image\/upload\/v\d+\/(.+)\.(jpg|jpeg|png|gif|webp)/i', $url, $matches)) {
+            return $matches[1];
+        }
+        return null;
+    }
+
+    /**
+     * Get image URL (handles both Cloudinary URLs and local storage paths)
+     */
+    private function getImageUrl($imagePath): string
+    {
+        // Cloudinary URLの場合はそのまま返す
+        if (str_starts_with($imagePath, 'http://') || str_starts_with($imagePath, 'https://')) {
+            return $imagePath;
+        }
+        
+        // パスの場合はStorage::url()を使用
+        return Storage::url($imagePath);
     }
 }
 

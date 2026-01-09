@@ -1,6 +1,3 @@
-@php
-use Illuminate\Support\Facades\Storage;
-@endphp
 <section>
     <header>
         <h2 class="text-lg font-medium text-gray-900">
@@ -22,7 +19,7 @@ use Illuminate\Support\Facades\Storage;
         <div class="flex items-center gap-4">
             <div class="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300 overflow-hidden shrink-0">
                 @if($user->avatar)
-                    <img src="{{ Storage::url($user->avatar) }}" alt="アバター" class="w-full h-full object-cover">
+                    <img src="{{ image_url($user->avatar) }}" alt="アバター" class="w-full h-full object-cover">
                 @else
                     <span class="text-2xl font-bold text-gray-500">{{ substr($user->name, 0, 1) }}</span>
                 @endif

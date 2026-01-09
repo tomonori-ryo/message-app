@@ -53,15 +53,23 @@ class ProfileController extends Controller
         ]);
 
         $user = $request->user();
+        $disk = env('CLOUDINARY_CLOUD_NAME') ? 'cloudinary' : 'public';
 
         // 古いアバターを削除
         if ($user->avatar) {
-            Storage::disk('public')->delete($user->avatar);
+            Storage::disk($disk)->delete($user->avatar);
         }
 
         // 新しいアバターを保存
-        $avatarPath = $request->file('avatar')->store('avatars', 'public');
-        $user->avatar = $avatarPath;
+        $avatarPath = $request->file('avatar')->store('avatars', $disk);
+        
+        // Cloudinaryを使用している場合、パブリックURLを取得
+        if ($disk === 'cloudinary') {
+            $user->avatar = Storage::disk($disk)->url($avatarPath);
+        } else {
+            $user->avatar = $avatarPath;
+        }
+        
         $user->save();
 
         return Redirect::route('profile.edit')->with('status', 'avatar-updated');
@@ -73,14 +81,50 @@ class ProfileController extends Controller
     public function deleteAvatar(Request $request): RedirectResponse
     {
         $user = $request->user();
+        $disk = env('CLOUDINARY_CLOUD_NAME') ? 'cloudinary' : 'public';
 
         if ($user->avatar) {
-            Storage::disk('public')->delete($user->avatar);
+            // Cloudinaryの場合はURLが保存されているので、パスを抽出して削除
+            if ($disk === 'cloudinary') {
+                // Cloudinary URLからpublic_idを抽出
+                $publicId = $this->extractPublicIdFromUrl($user->avatar);
+                if ($publicId) {
+                    Storage::disk($disk)->delete($publicId);
+                }
+            } else {
+                Storage::disk($disk)->delete($user->avatar);
+            }
             $user->avatar = null;
             $user->save();
         }
 
         return Redirect::route('profile.edit')->with('status', 'avatar-deleted');
+    }
+
+    /**
+     * Extract public_id from Cloudinary URL
+     */
+    private function extractPublicIdFromUrl($url): ?string
+    {
+        // Cloudinary URL形式: https://res.cloudinary.com/{cloud_name}/image/upload/v{version}/{public_id}.{extension}
+        if (preg_match('/\/image\/upload\/v\d+\/(.+)\.(jpg|jpeg|png|gif|webp)/i', $url, $matches)) {
+            return $matches[1];
+        }
+        return null;
+    }
+
+    /**
+     * Get image URL (handles both Cloudinary URLs and local storage paths)
+     */
+    private function getImageUrl($imagePath): string
+    {
+        // Cloudinary URLの場合はそのまま返す
+        if (str_starts_with($imagePath, 'http://') || str_starts_with($imagePath, 'https://')) {
+            return $imagePath;
+        }
+        
+        // パスの場合はStorage::url()を使用
+        return Storage::url($imagePath);
     }
 
     /**

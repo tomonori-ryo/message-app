@@ -123,9 +123,13 @@ use Illuminate\Support\Str;
         <form id="chat-form" method="POST" action="{{ route('chat.store', ['user' => $chatPartner->id]) }}">
             @csrf
             <div class="flex items-center gap-2 max-w-2xl mx-auto">
-                <input type="text" name="body" class="flex-1 bg-gray-100 border-0 focus:ring-2 focus:ring-indigo-500 rounded-full px-4 py-3 text-base" placeholder="メッセージを入力..." required autocomplete="off">
-                <button type="submit" class="bg-indigo-600 text-white rounded-full p-3 shadow-md active:scale-95 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
+                <input type="text" name="body" id="message-input" class="flex-1 bg-gray-100 border-0 focus:ring-2 focus:ring-indigo-500 rounded-full px-4 py-3 text-base" placeholder="メッセージを入力..." required autocomplete="off">
+                <button type="submit" id="send-button" class="bg-indigo-600 text-white rounded-full p-3 shadow-md active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <svg id="send-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
+                    <svg id="loading-spinner" class="hidden w-6 h-6 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
                 </button>
             </div>
         </form>
@@ -188,7 +192,7 @@ use Illuminate\Support\Str;
                                 <div class="w-12 h-12 rounded-lg flex items-center justify-center text-2xl shrink-0 transition-all peer-checked:scale-110 overflow-hidden" 
                                      style="background-color: {{ $type->color ?? '#6B7280' }}20;">
                                     @if($customIcon)
-                                        <img src="{{ Storage::url($customIcon) }}" alt="カスタムアイコン" class="w-full h-full object-cover">
+                                        <img src="{{ image_url($customIcon) }}" alt="カスタムアイコン" class="w-full h-full object-cover">
                                     @else
                                         {{ $type->icon ?? '📢' }}
                                     @endif
@@ -443,15 +447,47 @@ use Illuminate\Support\Str;
             }
         }
 
-        // --- フォーム送信時のスクロール調整 ---
+        // --- フォーム送信時の二重送信防止とローディング表示 ---
         const chatForm = document.getElementById('chat-form');
-        if (chatForm && chatContainer) {
-            chatForm.addEventListener('submit', () => {
+        const sendButton = document.getElementById('send-button');
+        const messageInput = document.getElementById('message-input');
+        const sendIcon = document.getElementById('send-icon');
+        const loadingSpinner = document.getElementById('loading-spinner');
+
+        // 入力フィールドの変更を監視してボタンの有効/無効を切り替え
+        if (messageInput && sendButton) {
+            messageInput.addEventListener('input', function() {
+                if (this.value.trim()) {
+                    sendButton.disabled = false;
+                } else {
+                    sendButton.disabled = true;
+                }
+            });
+        }
+
+        if (chatForm && sendButton && chatContainer) {
+            chatForm.addEventListener('submit', function(e) {
+                // ボタンを無効化
+                sendButton.disabled = true;
+                // アイコンを非表示にしてスピナーを表示
+                if (sendIcon) sendIcon.classList.add('hidden');
+                if (loadingSpinner) loadingSpinner.classList.remove('hidden');
+
                 // メッセージ送信後にスクロール位置を最下部に
                 setTimeout(() => {
                     adjustChatPadding();
                     chatContainer.scrollTop = chatContainer.scrollHeight;
                 }, 100);
+
+                // フォーム送信が完了したらボタンを再度有効化
+                // ただし、ページがリロードされる場合は自動でリセットされる
+                setTimeout(() => {
+                    sendButton.disabled = false;
+                    if (sendIcon) sendIcon.classList.remove('hidden');
+                    if (loadingSpinner) loadingSpinner.classList.add('hidden');
+                    if (messageInput) messageInput.value = '';
+                    if (messageInput) messageInput.focus();
+                }, 2000); // 2秒後にリセット（通常のリクエスト時間を想定）
             });
         }
 

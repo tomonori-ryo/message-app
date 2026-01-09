@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Storage;
             {{-- アイコン --}}
             <div class="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden">
                 @if($message->user->avatar)
-                    <img src="{{ Storage::url($message->user->avatar) }}" alt="{{ $message->user->name }}" class="w-full h-full object-cover">
+                    <img src="{{ image_url($message->user->avatar) }}" alt="{{ $message->user->name }}" class="w-full h-full object-cover">
                 @else
                     {{ substr($message->user->name, 0, 1) }}
                 @endif

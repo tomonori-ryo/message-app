@@ -44,7 +44,7 @@ use Illuminate\Support\Facades\Storage;
                                         <div class="flex items-center gap-3">
                                             <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-sm overflow-hidden shrink-0">
                                                 @if($blockedUser->avatar)
-                                                    <img src="{{ Storage::url($blockedUser->avatar) }}" alt="{{ $blockedUser->name }}" class="w-full h-full object-cover">
+                                                    <img src="{{ image_url($blockedUser->avatar) }}" alt="{{ $blockedUser->name }}" class="w-full h-full object-cover">
                                                 @else
                                                     {{ substr($blockedUser->name, 0, 1) }}
                                                 @endif

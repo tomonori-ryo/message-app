@@ -38,7 +38,7 @@
         <div class="mb-6 flex items-center gap-3">
             <div class="w-14 h-14 rounded-full bg-slate-200 flex items-center justify-center border-2 border-white shadow-sm overflow-hidden">
                 @if(auth()->user()->avatar)
-                    <img src="{{ Storage::url(auth()->user()->avatar) }}" alt="{{ auth()->user()->name }}" class="w-full h-full object-cover">
+                    <img src="{{ image_url(auth()->user()->avatar) }}" alt="{{ auth()->user()->name }}" class="w-full h-full object-cover">
                 @else
                     <span class="text-xl font-bold text-gray-500">{{ substr(auth()->user()->name, 0, 1) }}</span>
                 @endif
@@ -92,7 +92,7 @@
                                 <div class="flex items-center gap-3 flex-1">
                                     <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-sm overflow-hidden shrink-0">
                                         @if($result->avatar)
-                                            <img src="{{ Storage::url($result->avatar) }}" alt="{{ $result->name }}" class="w-full h-full object-cover">
+                                            <img src="{{ image_url($result->avatar) }}" alt="{{ $result->name }}" class="w-full h-full object-cover">
                                         @else
                                             {{ substr($result->name, 0, 1) }}
                                         @endif
@@ -271,7 +271,7 @@
                             <div class="w-12 h-12 rounded-lg flex items-center justify-center text-2xl shrink-0 overflow-hidden border-2 border-gray-200" 
                                  style="background-color: {{ $type->color ?? '#6B7280' }}20;">
                                 @if($customIcon)
-                                    <img src="{{ Storage::url($customIcon) }}" alt="アイコン" class="w-full h-full object-cover">
+                                    <img src="{{ image_url($customIcon) }}" alt="アイコン" class="w-full h-full object-cover">
                                 @else
                                     {{ $type->icon ?? '📢' }}
                                 @endif
@@ -294,7 +294,7 @@
                             <div class="w-12 h-12 rounded-lg flex items-center justify-center text-2xl shrink-0 overflow-hidden border-2 border-indigo-300" 
                                  style="background-color: {{ $type->color ?? '#6B7280' }}20;">
                                 @if($type->icon_image)
-                                    <img src="{{ Storage::url($type->icon_image) }}" alt="アイコン" class="w-full h-full object-cover">
+                                    <img src="{{ image_url($type->icon_image) }}" alt="アイコン" class="w-full h-full object-cover">
                                 @elseif($type->icon)
                                     {{ $type->icon }}
                                 @else
@@ -1076,7 +1076,7 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
                                 >
                                 <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm overflow-hidden shrink-0">
                                     @if($friend->avatar)
-                                        <img src="{{ Storage::url($friend->avatar) }}" alt="{{ $friend->name }}" class="w-full h-full object-cover">
+                                        <img src="{{ image_url($friend->avatar) }}" alt="{{ $friend->name }}" class="w-full h-full object-cover">
                                     @else
                                         {{ substr($friend->name, 0, 1) }}
                                     @endif

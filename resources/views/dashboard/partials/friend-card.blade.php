@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Storage;
         <div class="relative w-12 h-12 shrink-0">
             <div class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg overflow-hidden">
                 @if($friend->avatar)
-                    <img src="{{ Storage::url($friend->avatar) }}" alt="{{ $friend->name }}" class="w-full h-full object-cover">
+                    <img src="{{ image_url($friend->avatar) }}" alt="{{ $friend->name }}" class="w-full h-full object-cover">
                 @else
                     {{ substr($friend->name, 0, 1) }}
                 @endif
@@ -52,10 +52,10 @@ use Illuminate\Support\Facades\Storage;
                     $iconPath = null;
                     // カスタムアイコンを確認
                     if (isset($friendNotificationIcons[$friend->id])) {
-                        $iconPath = Storage::url($friendNotificationIcons[$friend->id]);
+                        $iconPath = image_url($friendNotificationIcons[$friend->id]);
                     } elseif (isset($notificationType->icon_image)) {
                         // カスタム通知タイプの場合
-                        $iconPath = Storage::url($notificationType->icon_image);
+                        $iconPath = image_url($notificationType->icon_image);
                     }
                 @endphp
                 <div class="flex items-center gap-1.5 shrink-0">
